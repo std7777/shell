@@ -4,6 +4,8 @@
 #include <builtins/echo.hpp>
 #include <builtins/exit.hpp>
 #include <builtins/type.hpp>
+#include <builtins/pwd.hpp>
+#include <builtins/cd.hpp>
 
 #include <unordered_map>
 #include <string>
@@ -16,7 +18,9 @@ namespace shell{
     static std::unordered_map<std::string, std::function<int(const std::string&)>> string_to_command{
         {"echo", &echo::execute},
         {"exit",&exit::execute},
-        {"type",&type::execute}
+        {"type",&type::execute},
+        {"pwd",&pwd::execute},
+        {"cd",&cd::execute}
     };
 
     std::pair<std::string, std::string> extract_keyword_input(const std::string& command){

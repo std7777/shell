@@ -11,7 +11,9 @@ namespace shell::common{
     static std::unordered_set<std::string> builtins {
             "echo",
             "exit",
-            "type"
+            "type",
+            "pwd",
+            "cd"
     };
 
     static std::vector<std::string> paths;
