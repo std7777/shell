@@ -7,7 +7,8 @@
 #include <sys/wait.h>
 
 namespace shell {
-    inline int execute_external(const Command& command){
+    // Called only in a child process; exec replaces it with the requested program.
+    [[noreturn]] inline void run_external_child(const Command& command){
         const std::string& name = command.arguments.front();
         std::string path = name.find('/') != std::string::npos
             ? name : common::get_command_path(name);
@@ -17,27 +18,20 @@ namespace shell {
         }
         arguments.push_back(nullptr);
 
-        flush_stdout();
-        std::cerr.flush();
-        pid_t child = fork();
-        if(child == -1){
-            std::perror("fork");
-            return 1;
+        OutputRedirection stdout_redirect(STDOUT_FILENO);
+        OutputRedirection stderr_redirect(STDERR_FILENO);
+        if(!stdout_redirect.apply(command.stdout_file, command.stdout_append)
+            || !stderr_redirect.apply(command.stderr_file, command.stderr_append)) _exit(1);
+        if(path.empty()){
+            std::cerr << name << ": command not found" << std::endl;
+            _exit(127);
         }
-        if(child == 0){
-            OutputRedirection stdout_redirect(STDOUT_FILENO);
-            OutputRedirection stderr_redirect(STDERR_FILENO);
-            if(!stdout_redirect.apply(command.stdout_file, command.stdout_append)
-                || !stderr_redirect.apply(command.stderr_file, command.stderr_append)) _exit(1);
-            if(path.empty()){
-                std::cerr << name << ": command not found" << std::endl;
-                _exit(127);
-            }
-            execv(path.c_str(), arguments.data());
-            std::perror(name.c_str());
-            _exit(126);
-        }
+        execv(path.c_str(), arguments.data());
+        std::perror(name.c_str());
+        _exit(126);
+    }
 
+    inline int wait_for_child(pid_t child){
         int status;
         while(waitpid(child, &status, 0) == -1){
             if(errno == EINTR) continue;
@@ -47,5 +41,17 @@ namespace shell {
         if(WIFEXITED(status)) return WEXITSTATUS(status);
         if(WIFSIGNALED(status)) return 128 + WTERMSIG(status);
         return 1;
+    }
+
+    inline int execute_external(const Command& command){
+        flush_stdout();
+        std::cerr.flush();
+        pid_t child = fork();
+        if(child == -1){
+            std::perror("fork");
+            return 1;
+        }
+        if(child == 0) run_external_child(command);
+        return wait_for_child(child);
     }
 }

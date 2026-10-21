@@ -5,7 +5,8 @@
 #include <stdexcept>
 
 namespace shell {
-    inline Command parse_command(const std::string& input){
+    inline std::vector<Command> parse_pipeline(const std::string& input){
+        std::vector<Command> commands;
         Command command;
         std::string word;
         bool word_started = false;
@@ -54,6 +55,13 @@ namespace shell {
                 plain_word = false;
             }else if(std::isspace(static_cast<unsigned char>(ch))){
                 finish_word();
+            }else if(ch == '|'){
+                finish_word();
+                if(expecting_filename) throw std::runtime_error("missing redirection filename");
+                if(command.arguments.empty()) throw std::runtime_error("missing pipeline command");
+                commands.push_back(command);
+                command = Command{};
+                redirect_stderr = false;
             }else if(ch == '>'){
                 if(expecting_filename) throw std::runtime_error("missing redirection filename");
                 // Only an adjacent, unquoted descriptor selects the stream.
@@ -79,6 +87,10 @@ namespace shell {
         if(quote != '\0') throw std::runtime_error("unclosed quote");
         finish_word();
         if(expecting_filename) throw std::runtime_error("missing redirection filename");
-        return command;
+        if(!commands.empty() && command.arguments.empty()){
+            throw std::runtime_error("missing pipeline command");
+        }
+        commands.push_back(command);
+        return commands;
     }
 }

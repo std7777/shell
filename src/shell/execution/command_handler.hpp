@@ -2,6 +2,7 @@
 
 #include "parser.hpp"
 #include "executor.hpp"
+#include "pipeline.hpp"
 #include <builtins/echo.hpp>
 #include <builtins/exit.hpp>
 #include <builtins/type.hpp>
@@ -20,13 +21,21 @@ namespace shell {
     };
 
     inline ExecutionResult execute(const std::string& input){
-        Command command;
+        std::vector<Command> commands;
         try{
-            command = parse_command(input);
+            commands = parse_pipeline(input);
+            if(commands.size() > 2){
+                throw std::runtime_error("only two-command pipelines are supported yet");
+            }
         }catch(const std::runtime_error& error){
             std::cerr << "shell: " << error.what() << std::endl;
             return {2, false};
         }
+
+        if(commands.size() == 2){
+            return {execute_pipeline(commands[0], commands[1]), false};
+        }
+        const Command& command = commands.front();
 
         if(command.arguments.empty()){
             OutputRedirection stdout_redirect(STDOUT_FILENO);
