@@ -30,7 +30,7 @@ namespace shell {
         OutputRedirection(const OutputRedirection&) = delete;
         OutputRedirection& operator=(const OutputRedirection&) = delete;
 
-        bool apply(const std::optional<std::string>& filename){
+        bool apply(const std::optional<std::string>& filename, bool append = false){
             if(!filename) return true;
             flush_stream();
             saved_fd = dup(target_fd);
@@ -38,7 +38,8 @@ namespace shell {
                 std::perror("dup");
                 return false;
             }
-            int file = open(filename->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            int flags = O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC);
+            int file = open(filename->c_str(), flags, 0644);
             if(file == -1){
                 std::perror(filename->c_str());
                 return false;

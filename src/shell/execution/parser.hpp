@@ -64,6 +64,14 @@ namespace shell {
                 }else{
                     finish_word();
                 }
+                bool append = i + 1 < input.size() && input[i + 1] == '>';
+                if(append){
+                    ++i;
+                    if(redirect_stderr){
+                        throw std::runtime_error("stderr append is not supported yet");
+                    }
+                }
+                if(!redirect_stderr) command.stdout_append = append;
                 expecting_filename = true;
             }else{
                 word += ch;

@@ -27,7 +27,7 @@ namespace shell {
         if(child == 0){
             OutputRedirection stdout_redirect(STDOUT_FILENO);
             OutputRedirection stderr_redirect(STDERR_FILENO);
-            if(!stdout_redirect.apply(command.stdout_file)
+            if(!stdout_redirect.apply(command.stdout_file, command.stdout_append)
                 || !stderr_redirect.apply(command.stderr_file)) _exit(1);
             if(path.empty()){
                 std::cerr << name << ": command not found" << std::endl;

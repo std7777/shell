@@ -31,7 +31,7 @@ namespace shell {
         if(command.arguments.empty()){
             OutputRedirection stdout_redirect(STDOUT_FILENO);
             OutputRedirection stderr_redirect(STDERR_FILENO);
-            return {stdout_redirect.apply(command.stdout_file)
+            return {stdout_redirect.apply(command.stdout_file, command.stdout_append)
                 && stderr_redirect.apply(command.stderr_file) ? 0 : 1, false};
         }
         auto builtin = string_to_command.find(command.arguments.front());
@@ -41,7 +41,7 @@ namespace shell {
 
         OutputRedirection stdout_redirect(STDOUT_FILENO);
         OutputRedirection stderr_redirect(STDERR_FILENO);
-        if(!stdout_redirect.apply(command.stdout_file)
+        if(!stdout_redirect.apply(command.stdout_file, command.stdout_append)
             || !stderr_redirect.apply(command.stderr_file)) return {1, false};
         // Preserve the existing builtin interface while passing parsed arguments.
         std::string arguments;
