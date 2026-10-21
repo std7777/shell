@@ -23,56 +23,66 @@ namespace shell {
         _exit(command.arguments.front() == "exit" ? 0 : status);
     }
 
-    inline int execute_pipeline(const Command& left, const Command& right){
-        int pipe_fds[2];
-        if(pipe(pipe_fds) == -1){
-            std::perror("pipe");
-            return 1;
-        }
+    inline int execute_pipeline(const std::vector<Command>& commands){
+        std::vector<pid_t> children;
+        children.reserve(commands.size());
+        int previous_read = -1;
+
+        // If setup fails halfway through, stop and reap children already started.
+        auto stop_children = [&] {
+            if(previous_read != -1) close(previous_read);
+            for(pid_t child : children) kill(child, SIGKILL);
+            for(pid_t child : children) wait_for_child(child);
+        };
 
         flush_stdout();
         std::cerr.flush();
-        pid_t producer = fork();
-        if(producer == -1){
-            std::perror("fork");
-            close(pipe_fds[0]);
-            close(pipe_fds[1]);
-            return 1;
-        }
-        if(producer == 0){
-            if(dup2(pipe_fds[1], STDOUT_FILENO) == -1){
-                std::perror("dup2");
-                _exit(1);
+        for(size_t i = 0; i < commands.size(); ++i){
+            bool has_next = i + 1 < commands.size();
+            int next_pipe[2] = {-1, -1};
+            if(has_next && pipe(next_pipe) == -1){
+                std::perror("pipe");
+                stop_children();
+                return 1;
             }
-            close(pipe_fds[0]);
-            close(pipe_fds[1]);
-            run_pipeline_child(left);
+
+            pid_t child = fork();
+            if(child == -1){
+                std::perror("fork");
+                if(has_next){
+                    close(next_pipe[0]);
+                    close(next_pipe[1]);
+                }
+                stop_children();
+                return 1;
+            }
+            if(child == 0){
+                if(previous_read != -1 && dup2(previous_read, STDIN_FILENO) == -1){
+                    std::perror("dup2");
+                    _exit(1);
+                }
+                if(has_next && dup2(next_pipe[1], STDOUT_FILENO) == -1){
+                    std::perror("dup2");
+                    _exit(1);
+                }
+                if(previous_read != -1) close(previous_read);
+                if(has_next){
+                    close(next_pipe[0]);
+                    close(next_pipe[1]);
+                }
+                run_pipeline_child(commands[i]);
+            }
+
+            children.push_back(child);
+            // Keep only the read end needed to launch the next command.
+            if(previous_read != -1) close(previous_read);
+            if(has_next) close(next_pipe[1]);
+            previous_read = next_pipe[0];
         }
 
-        // Start the reader before waiting: the writer may fill the pipe buffer.
-        pid_t consumer = fork();
-        if(consumer == -1){
-            std::perror("fork");
-            close(pipe_fds[0]);
-            close(pipe_fds[1]);
-            kill(producer, SIGKILL);
-            wait_for_child(producer);
-            return 1;
-        }
-        if(consumer == 0){
-            if(dup2(pipe_fds[0], STDIN_FILENO) == -1){
-                std::perror("dup2");
-                _exit(1);
-            }
-            close(pipe_fds[0]);
-            close(pipe_fds[1]);
-            run_pipeline_child(right);
-        }
-
-        // The parent must hold neither end, allowing EOF and SIGPIPE to propagate.
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        wait_for_child(producer);
-        return wait_for_child(consumer);
+        // Every stage must be running before we wait, so full pipes cannot stall setup.
+        int status = 0;
+        for(pid_t child : children) status = wait_for_child(child);
+        return status;
     }
 }
