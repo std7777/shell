@@ -10,6 +10,7 @@ namespace shell {
         std::optional<std::string> stdout_file;
         bool stdout_append = false;
         std::optional<std::string> stderr_file;
+        bool stderr_append = false;
     };
 
     struct ExecutionResult {
