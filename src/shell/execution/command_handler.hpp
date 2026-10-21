@@ -29,16 +29,20 @@ namespace shell {
         }
 
         if(command.arguments.empty()){
-            StdoutRedirection redirection;
-            return {redirection.apply(command.stdout_file) ? 0 : 1, false};
+            OutputRedirection stdout_redirect(STDOUT_FILENO);
+            OutputRedirection stderr_redirect(STDERR_FILENO);
+            return {stdout_redirect.apply(command.stdout_file)
+                && stderr_redirect.apply(command.stderr_file) ? 0 : 1, false};
         }
         auto builtin = string_to_command.find(command.arguments.front());
         if(builtin == string_to_command.end()){
             return {execute_external(command), false};
         }
 
-        StdoutRedirection redirection;
-        if(!redirection.apply(command.stdout_file)) return {1, false};
+        OutputRedirection stdout_redirect(STDOUT_FILENO);
+        OutputRedirection stderr_redirect(STDERR_FILENO);
+        if(!stdout_redirect.apply(command.stdout_file)
+            || !stderr_redirect.apply(command.stderr_file)) return {1, false};
         // Preserve the existing builtin interface while passing parsed arguments.
         std::string arguments;
         for(size_t i = 1; i < command.arguments.size(); ++i){

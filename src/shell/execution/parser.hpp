@@ -11,12 +11,14 @@ namespace shell {
         bool word_started = false;
         bool plain_word = true;
         bool expecting_filename = false;
+        bool redirect_stderr = false;
         char quote = '\0';
 
         auto finish_word = [&] {
             if(!word_started) return;
             if(expecting_filename){
-                command.stdout_file = word;
+                if(redirect_stderr) command.stderr_file = word;
+                else command.stdout_file = word;
                 expecting_filename = false;
             }else{
                 command.arguments.push_back(word);
@@ -54,8 +56,9 @@ namespace shell {
                 finish_word();
             }else if(ch == '>'){
                 if(expecting_filename) throw std::runtime_error("missing redirection filename");
-                // Only an adjacent, unquoted 1 denotes stdout's descriptor.
-                if(plain_word && word_started && word == "1"){
+                // Only an adjacent, unquoted descriptor selects the stream.
+                redirect_stderr = plain_word && word_started && word == "2";
+                if(plain_word && word_started && (word == "1" || word == "2")){
                     word.clear();
                     word_started = false;
                 }else{

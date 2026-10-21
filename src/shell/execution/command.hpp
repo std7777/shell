@@ -8,6 +8,7 @@ namespace shell {
     struct Command {
         std::vector<std::string> arguments;
         std::optional<std::string> stdout_file;
+        std::optional<std::string> stderr_file;
     };
 
     struct ExecutionResult {

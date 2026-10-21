@@ -13,19 +13,28 @@ namespace shell {
         std::fflush(stdout);
     }
 
-    // Builtins run in the shell process, so restore stdout when this scope ends.
-    class StdoutRedirection {
-        int saved_stdout = -1;
+    // Builtins run in the shell process, so restore the stream when this scope ends.
+    class OutputRedirection {
+        int target_fd;
+        int saved_fd = -1;
+
+        void flush_stream(){
+            if(target_fd == STDOUT_FILENO) flush_stdout();
+            else{
+                std::cerr.flush();
+                std::fflush(stderr);
+            }
+        }
     public:
-        StdoutRedirection() = default;
-        StdoutRedirection(const StdoutRedirection&) = delete;
-        StdoutRedirection& operator=(const StdoutRedirection&) = delete;
+        explicit OutputRedirection(int descriptor) : target_fd(descriptor) {}
+        OutputRedirection(const OutputRedirection&) = delete;
+        OutputRedirection& operator=(const OutputRedirection&) = delete;
 
         bool apply(const std::optional<std::string>& filename){
             if(!filename) return true;
-            flush_stdout();
-            saved_stdout = dup(STDOUT_FILENO);
-            if(saved_stdout == -1){
+            flush_stream();
+            saved_fd = dup(target_fd);
+            if(saved_fd == -1){
                 std::perror("dup");
                 return false;
             }
@@ -34,17 +43,17 @@ namespace shell {
                 std::perror(filename->c_str());
                 return false;
             }
-            bool success = dup2(file, STDOUT_FILENO) != -1;
+            bool success = dup2(file, target_fd) != -1;
             if(!success) std::perror("dup2");
             close(file);
             return success;
         }
 
-        ~StdoutRedirection(){
-            if(saved_stdout != -1){
-                flush_stdout();
-                if(dup2(saved_stdout, STDOUT_FILENO) == -1) std::perror("dup2");
-                close(saved_stdout);
+        ~OutputRedirection(){
+            if(saved_fd != -1){
+                flush_stream();
+                if(dup2(saved_fd, target_fd) == -1) std::perror("dup2");
+                close(saved_fd);
             }
         }
     };
