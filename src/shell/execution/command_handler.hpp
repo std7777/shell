@@ -3,23 +3,9 @@
 #include "parser.hpp"
 #include "executor.hpp"
 #include "pipeline.hpp"
-#include <builtins/echo.hpp>
-#include <builtins/exit.hpp>
-#include <builtins/type.hpp>
-#include <builtins/pwd.hpp>
-#include <builtins/cd.hpp>
-#include <functional>
-#include <unordered_map>
+#include "builtin_dispatch.hpp"
 
 namespace shell {
-    inline const std::unordered_map<std::string, std::function<int(const std::string&)>> string_to_command{
-        {"echo", &echo::execute},
-        {"exit", &exit::execute},
-        {"type", &type::execute},
-        {"pwd", &pwd::execute},
-        {"cd", &cd::execute}
-    };
-
     inline ExecutionResult execute(const std::string& input){
         std::vector<Command> commands;
         try{
@@ -52,13 +38,7 @@ namespace shell {
         OutputRedirection stderr_redirect(STDERR_FILENO);
         if(!stdout_redirect.apply(command.stdout_file, command.stdout_append)
             || !stderr_redirect.apply(command.stderr_file, command.stderr_append)) return {1, false};
-        // Preserve the existing builtin interface while passing parsed arguments.
-        std::string arguments;
-        for(size_t i = 1; i < command.arguments.size(); ++i){
-            if(i > 1) arguments += ' ';
-            arguments += command.arguments[i];
-        }
-        int status = builtin->second(arguments);
+        int status = builtin->second(builtin_arguments(command));
         bool should_exit = command.arguments.front() == "exit";
         return {should_exit ? 0 : status, should_exit};
     }
